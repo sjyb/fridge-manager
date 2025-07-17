@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS food_logs (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 创建初始用户
+-- 注意：在群晖系统中，请使用管理员账户或已授权账户连接数据库
+-- 群晖MariaDB权限配置
 CREATE USER IF NOT EXISTS 'fridge_user'@'%' IDENTIFIED BY 'fridge_password';
 GRANT ALL PRIVILEGES ON fridge_manager.* TO 'fridge_user'@'%';
 FLUSH PRIVILEGES;

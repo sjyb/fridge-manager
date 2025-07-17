@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     zip \
     unzip \
+    mariadb-client \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
 # 启用Apache的rewrite模块

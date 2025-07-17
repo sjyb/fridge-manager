@@ -39,17 +39,16 @@ if [[ "$1" == "--plain-docker" ]]; then
     USE_PLAIN_DOCKER=1
     echo "使用纯Docker模式部署..."
 else
-    sudo chmod +x //volume1/docker/compose/docker-compose
     # 检查docker-compose是否安装
-#    if ! command -v docker-compose &> /dev/null; then
-#        echo "docker-compose未安装，正在安装..."
-#        if [[ "$OS" == "mac" ]]; then
-#           brew install docker-compose
-#        else
-#            sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-#           sudo chmod +x /usr/local/bin/docker-compose
-#       fi
-#    fi
+    if ! command -v docker-compose &> /dev/null; then
+        echo "docker-compose未安装，正在安装..."
+        if [[ "$OS" == "mac" ]]; then
+            brew install docker-compose
+        else
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        fi
+    fi
 fi
 
 # 创建项目目录
@@ -89,34 +88,60 @@ chmod -R 755 .
 # 启动服务
 echo "正在启动服务..."
 if [[ $USE_PLAIN_DOCKER -eq 1 ]]; then
-    # 纯Docker模式部署
+    # 纯Docker模式部署 - 群晖本地数据库配置
+    echo "请确保群晖本地数据库已启动并创建fridge_manager数据库"
+    echo "请输入群晖本地数据库信息:"
+    read -p "数据库主机(默认: localhost): " DB_HOST
+    read -p "数据库端口(默认: 3306): " DB_PORT
+    read -p "数据库名称(默认: fridge_manager): " DB_NAME
+    read -p "数据库用户名: " DB_USER
+    read -s -p "数据库密码: " DB_PASSWORD
+    echo
+     
+    # 设置默认值
+    DB_HOST=${DB_HOST:-localhost}
+    DB_PORT=${DB_PORT:-3306}
+    DB_NAME=${DB_NAME:-fridge_manager}
+     
     echo "创建专用网络..."
-    docker network inspect fridge-network >/dev/null 2>&1 || docker network create fridge-network
-    
-    echo "启动数据库容器..."
-    docker run -d \
-      --name fridge-db \
-      --network fridge-network \
-      -v $(pwd)/db_data:/var/lib/mysql \
-      -e MYSQL_ROOT_PASSWORD=rootpassword \
-      -e MYSQL_DATABASE=fridge_manager \
-      -p 3306:3306 \
-      --restart unless-stopped \
-      mariadb:10.6
     
     echo "构建应用镜像..."
     docker build -t fridge-app .
     
     echo "启动应用容器..."
+    # 创建数据库（如果不存在）
+    echo "正在检查并创建数据库..."
+    docker run --rm \
+      --network=host \
+      mariadb:10.3.32 \
+      mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASSWORD -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+    
+    echo "正在初始化数据库结构..."
+    docker run --rm \
+      --network=host \
+      -v $(pwd)/db:/sql \
+      mariadb:10.3.32 \
+      mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASSWORD $DB_NAME < /sql/schema.sql
+    
+    echo "正在从SQLite迁移数据到MariaDB..."
+    docker run --rm \
+      --network=host \
+      -v $(pwd)/src/api:/app \
+      -v $(pwd)/db:/db \
+      php:8.1-cli \
+      php /db/migrate.php --sqlite /app/fridge.db --mysql-host $DB_HOST --mysql-port $DB_PORT --mysql-db $DB_NAME --mysql-user $DB_USER --mysql-pass "$DB_PASSWORD"
+    
+    echo "启动应用容器..."
     docker run -d \
       --name fridge-app \
-      --network fridge-network \
+      --network=host \
       -v $(pwd)/src:/var/www/html/src \
       -v $(pwd)/public:/var/www/html/public \
-      -e DB_HOST=fridge-db \
-      -e DB_NAME=fridge_manager \
-      -e DB_USER=root \
-      -e DB_PASSWORD=rootpassword \
+      -e DB_HOST=$DB_HOST \
+      -e DB_PORT=$DB_PORT \
+      -e DB_NAME=$DB_NAME \
+      -e DB_USER=$DB_USER \
+      -e DB_PASSWORD=$DB_PASSWORD \
       -p 3000:80 \
       --restart unless-stopped \
       fridge-app

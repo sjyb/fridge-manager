@@ -1,109 +1,148 @@
-# 智能冰箱管理系统
+# 冰箱管家 - 群晖NAS部署指南
 
-一个现代化的智能冰箱管理应用，帮助用户追踪食物保质期、管理库存并提供膳食建议。
+## 目录
+1. [准备工作](#准备工作)
+2. [群晖MariaDB配置](#群晖mariadb配置)
+3. [数据迁移（从SQLite到MariaDB）](#数据迁移从sqlite到mariadb)
+4. [Docker部署](#docker部署)
+5. [故障排除](#故障排除)
 
-## 功能特点
+## 准备工作
 
-- 直观的冰箱分区管理（冷藏、冷冻、解冻）
-- 食物保质期追踪与提醒
-- 智能膳食推荐
-- 消费统计与分析
-- 多设备同步
+### 环境要求
+- 群晖NAS（DSM 6.2及以上版本）
+- 已安装MariaDB 10.3.32套件
+- 已安装Docker套件
+- 网络连接正常
 
-## 部署指南
+### 必要准备
+1. 确保群晖NAS已启用SSH服务
+   - 控制面板 > 终端机和SNMP > 启用SSH功能
+2. 确保MariaDB已安装并运行
+   - 套件中心 > 已安装 > MariaDB 10 > 启动
+3. 准备一个SSH客户端（如PuTTY、Terminal等）
 
-### 前提条件
+## 群晖MariaDB配置
 
-- Docker
-- Git
+### 1. 登录MariaDB管理界面
+1. 打开群晖DSM界面
+2. 启动MariaDB 10套件
+3. 打开phpMyAdmin（可通过套件中心安装）
 
-### 选项1: 使用Docker Compose部署（推荐）
+### 2. 创建数据库和用户
+1. 登录phpMyAdmin（默认用户名：root，密码：安装MariaDB时设置的密码）
+2. 创建数据库：
+   - 点击左侧"数据库"
+   - 数据库名称：`fridge_manager`
+   - 排序规则：`utf8mb4_general_ci`
+   - 点击"创建"
+3. 创建用户并授权：
+   - 点击"用户账户" > "添加用户账户"
+   - 用户名：`fridge_user`
+   - 主机名：`%`（允许所有主机访问）
+   - 密码：设置一个安全密码（例如：`fridge_password`）
+   - 全局权限：勾选"所有权限"
+   - 点击"执行"
 
+### 3. 配置MariaDB远程访问（如需要）
+1. 打开群晖控制面板 > 防火墙 > 防火墙规则
+2. 添加规则允许端口3306的TCP连接
+3. 注意：如果仅在NAS内部访问，可跳过此步骤
+
+## 数据迁移（从SQLite到MariaDB）
+
+### 1. 获取SQLite数据库文件
+如果您之前使用SQLite版本，需要获取`fridge.db`文件：
+```bash
+# 通过SSH连接到群晖NAS后执行
+cd /path/to/your/fridge-manager/src/api
+cp fridge.db /tmp/  # 备份数据库文件
+```
+
+### 2. 执行数据迁移
 ```bash
 # 克隆仓库
 git clone https://github.com/sjyb/fridge-manager.git
 cd fridge-manager
 
-# 启动服务
-docker-compose up -d --build
-
-# 访问应用
-open http://localhost:3000
+# 运行迁移脚本
+php db/migrate.php \
+  --sqlite /path/to/your/fridge.db \
+  --mysql-host localhost \
+  --mysql-port 3306 \
+  --mysql-db fridge_manager \
+  --mysql-user fridge_user \
+  --mysql-pass your_password
 ```
 
-### 选项2: 仅使用Docker部署
+## Docker部署
 
-如果你不想使用docker-compose，可以通过以下命令手动部署：
-
+### 1. 通过SSH连接到群晖NAS
 ```bash
-# 克隆仓库
+ssh your_username@your_nas_ip
+```
+
+### 2. 克隆代码仓库
+```bash
+cd /volume1/docker  # 或您喜欢的目录
 git clone https://github.com/sjyb/fridge-manager.git
 cd fridge-manager
-
-# 创建专用网络
-docker network create fridge-network
-
-# 启动数据库容器
-docker run -d \
-  --name fridge-db \
-  --network fridge-network \
-  -v $(pwd)/db_data:/var/lib/mysql \
-  -e MYSQL_ROOT_PASSWORD=rootpassword \
-  -e MYSQL_DATABASE=fridge_manager \
-  -p 3306:3306 \
-  --restart unless-stopped \
-  mariadb:10.6
-
-# 构建应用镜像
-docker build -t fridge-app .
-
-# 启动应用容器
-docker run -d \
-  --name fridge-app \
-  --network fridge-network \
-  -v $(pwd)/src:/var/www/html/src \
-  -v $(pwd)/public:/var/www/html/public \
-  -e DB_HOST=fridge-db \
-  -e DB_NAME=fridge_manager \
-  -e DB_USER=root \
-  -e DB_PASSWORD=rootpassword \
-  -p 3000:80 \
-  --restart unless-stopped \
-  fridge-app
-
-# 初始化数据库
-docker exec fridge-db mysql -uroot -prootpassword fridge_manager < /var/www/html/db/schema.sql
-
-# 访问应用
-open http://localhost:3000
 ```
 
-### 选项3: 使用一键部署脚本
-
+### 3. 执行部署脚本
 ```bash
-# 下载并运行部署脚本
-curl -fsSL https://raw.githubusercontent.com/sjyb/fridge-manager/main/deploy.sh | bash
-
-# 或者从本地运行
-./deploy.sh
+chmod +x deploy.sh
+./deploy.sh --plain-docker
 ```
 
-## 使用说明
+### 4. 按照提示输入数据库信息
+```
+请输入群晖本地数据库信息:
+数据库主机(默认: localhost): localhost
+数据库端口(默认: 3306): 3306
+数据库名称(默认: fridge_manager): fridge_manager
+数据库用户名: fridge_user
+数据库密码: your_password
+```
 
-1. 首次登录后，设置你的冰箱功能区配置
-2. 添加食物到相应的区域
-3. 设置食物保质期
-4. 查看统计分析和膳食建议
+### 5. 访问应用
+部署完成后，通过以下地址访问冰箱管家：
+```
+http://your_nas_ip:3000
+```
 
 ## 故障排除
 
-- **数据库连接问题**: 确保数据库容器先于应用容器启动
-- **端口冲突**: 如果3000或3306端口已被占用，可以在启动命令中修改端口映射
-- **数据持久化**: 数据库数据存储在本地`db_data`目录中，删除此目录将清除所有数据
+### 常见问题及解决方法
 
-## 技术栈
+#### 1. 数据库连接失败
+- **症状**：应用无法启动，日志显示数据库连接错误
+- **解决方法**：
+  - 检查MariaDB是否正在运行
+  - 验证数据库用户名和密码是否正确
+  - 确认数据库主机和端口是否可访问
+  - 检查防火墙设置是否阻止了连接
 
-- Frontend: React, TypeScript, Tailwind CSS
-- Backend: PHP
-- Database: MariaDB
-- Containerization: Docker
+#### 2. 数据迁移失败
+- **症状**：迁移脚本报错，数据未完全迁移
+- **解决方法**：
+  - 确保SQLite文件路径正确且有读取权限
+  - 确认MariaDB用户有足够权限创建表和插入数据
+  - 检查数据库字符集是否为utf8mb4
+
+#### 3. Docker容器无法启动
+- **症状**：执行deploy.sh后容器未运行
+- **解决方法**：
+  - 查看容器日志：`docker logs fridge-app`
+  - 检查端口3000是否已被占用
+  - 确认环境变量是否正确设置
+
+#### 4. 网页无法访问
+- **症状**：浏览器访问http://your_nas_ip:3000无响应
+- **解决方法**：
+  - 检查容器是否正在运行：`docker ps | grep fridge-app`
+  - 检查群晖防火墙是否允许端口3000访问
+  - 查看应用日志：`docker logs fridge-app`
+
+### 获取帮助
+如果遇到其他问题，请提交issue到GitHub仓库或联系技术支持。
