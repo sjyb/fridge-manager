@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    volumes:
+      - ./src:/var/www/html/src
+      - ./public:/var/www/html/public
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_NAME=fridge_manager
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - ORBSTACK_COMPAT=1
+    restart: unless-stopped
+    networks:
+      - orbstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    image: mariadb:10.6
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=fridge_manager
+    ports:
+      - "3306:3306"  # 云服务器部署建议注释此行，通过内部网络访问
+    restart: unless-stopped
+    networks:
+      - orbstack
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 3
+
+volumes:
+  db_data:
+
+networks:
+  orbstack:
+    driver: bridge
+    name: orbstack
+    attachable: true
+    # 云服务器部署建议添加以下配置：
+    # ipam:
+    #   config:
+    #     - subnet: 172.20.0.0/16
+
