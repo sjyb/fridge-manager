@@ -148,9 +148,13 @@ if [[ $USE_PLAIN_DOCKER -eq 1 ]]; then
     
     echo "等待数据库初始化..."
     sleep 10
-    
-    echo "初始化数据库结构..."
-    docker exec fridge-db mysql -uroot -prootpassword fridge_manager < /var/www/html/db/schema.sql
+     
+     echo "初始化数据库结构..."
+     docker run --rm \
+       --network=host \
+       -v $(pwd)/db:/sql \
+       mariadb:10.3.32 \
+       mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASSWORD $DB_NAME < /sql/schema.sql
 else
     # 使用docker-compose部署
     docker-compose up -d --build
