@@ -1,26 +1,24 @@
 # 智能冰箱管理系统
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+一个现代化的智能冰箱管理应用，帮助用户追踪食物保质期、管理库存并提供膳食建议。
 
-一个基于React和PHP的智能冰箱管理系统，支持食物管理、保质期提醒和统计分析功能。
+## 功能特点
 
-## 功能特性
-
-- 🥗 食物分类管理
-- ⏳ 保质期提醒
-- 📊 消耗统计分析
-- 🧊 多温区管理(冷藏/冷冻/解冻)
-- 📱 移动端适配
+- 直观的冰箱分区管理（冷藏、冷冻、解冻）
+- 食物保质期追踪与提醒
+- 智能膳食推荐
+- 消费统计与分析
+- 多设备同步
 
 ## 部署指南
 
-### 1. Docker本地部署
+### 前提条件
 
-#### 前提条件
-- Docker Desktop已安装
-- docker-compose已安装
+- Docker
+- Git
 
-#### 部署步骤
+### 选项1: 使用Docker Compose部署（推荐）
+
 ```bash
 # 克隆仓库
 git clone https://github.com/sjyb/fridge-manager.git
@@ -30,79 +28,82 @@ cd fridge-manager
 docker-compose up -d --build
 
 # 访问应用
-http://localhost:3000
+open http://localhost:3000
 ```
 
-### 2. OrbStack(Mac)部署
+### 选项2: 仅使用Docker部署
 
-#### 前提条件
-- OrbStack已安装并运行
-- Docker CLI已配置
+如果你不想使用docker-compose，可以通过以下命令手动部署：
 
-#### 部署步骤
 ```bash
 # 克隆仓库
 git clone https://github.com/sjyb/fridge-manager.git
 cd fridge-manager
 
-# 启用OrbStack网络支持
-sed -i '' 's/# networks:/networks:/g' docker-compose.yml
+# 创建专用网络
+docker network create fridge-network
 
-# 启动服务
-docker-compose up -d --build
+# 启动数据库容器
+docker run -d \
+  --name fridge-db \
+  --network fridge-network \
+  -v $(pwd)/db_data:/var/lib/mysql \
+  -e MYSQL_ROOT_PASSWORD=rootpassword \
+  -e MYSQL_DATABASE=fridge_manager \
+  -p 3306:3306 \
+  --restart unless-stopped \
+  mariadb:10.6
+
+# 构建应用镜像
+docker build -t fridge-app .
+
+# 启动应用容器
+docker run -d \
+  --name fridge-app \
+  --network fridge-network \
+  -v $(pwd)/src:/var/www/html/src \
+  -v $(pwd)/public:/var/www/html/public \
+  -e DB_HOST=fridge-db \
+  -e DB_NAME=fridge_manager \
+  -e DB_USER=root \
+  -e DB_PASSWORD=rootpassword \
+  -p 3000:80 \
+  --restart unless-stopped \
+  fridge-app
+
+# 初始化数据库
+docker exec fridge-db mysql -uroot -prootpassword fridge_manager < /var/www/html/db/schema.sql
 
 # 访问应用
-http://localhost:3000
+open http://localhost:3000
 ```
 
-### 3. 云服务器部署
-
-#### 前提条件
-- Linux服务器(Ubuntu 20.04+)
-- Docker和docker-compose已安装
-
-#### 部署步骤
-```bash
-# 安装依赖
-sudo apt update && sudo apt install -y docker.io docker-compose
-
-# 克隆仓库
-git clone https://github.com/sjyb/fridge-manager.git
-cd fridge-manager
-
-# 优化云服务器配置
-sed -i 's/ports:.*3306.*/# ports: 3306/g' docker-compose.yml
-
-# 启动服务
-docker-compose up -d --build
-
-# 配置防火墙(如果需要)
-sudo ufw allow 3000
-
-# 访问应用
-http://<服务器IP>:3000
-```
-
-## 开发
+### 选项3: 使用一键部署脚本
 
 ```bash
-# 安装依赖
-pnpm install
+# 下载并运行部署脚本
+curl -fsSL https://raw.githubusercontent.com/sjyb/fridge-manager/main/deploy.sh | bash
 
-# 启动开发服务器
-pnpm dev
-
-# 构建生产版本
-pnpm build
+# 或者从本地运行
+./deploy.sh
 ```
+
+## 使用说明
+
+1. 首次登录后，设置你的冰箱功能区配置
+2. 添加食物到相应的区域
+3. 设置食物保质期
+4. 查看统计分析和膳食建议
+
+## 故障排除
+
+- **数据库连接问题**: 确保数据库容器先于应用容器启动
+- **端口冲突**: 如果3000或3306端口已被占用，可以在启动命令中修改端口映射
+- **数据持久化**: 数据库数据存储在本地`db_data`目录中，删除此目录将清除所有数据
 
 ## 技术栈
 
-- 前端: React 18, TypeScript, Tailwind CSS
-- 后端: PHP 8.1
-- 数据库: MariaDB
-- 容器: Docker
-
-## 许可证
-
-MIT License
+- Frontend: React, TypeScript, Tailwind CSS
+- Backend: PHP
+- Database: MariaDB
+- Containerization: Docker
