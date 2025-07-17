@@ -39,16 +39,17 @@ if [[ "$1" == "--plain-docker" ]]; then
     USE_PLAIN_DOCKER=1
     echo "使用纯Docker模式部署..."
 else
+    sudo chmod +x //volume1/docker/compose/docker-compose
     # 检查docker-compose是否安装
-    if ! command -v docker-compose &> /dev/null; then
-        echo "docker-compose未安装，正在安装..."
-        if [[ "$OS" == "mac" ]]; then
-            brew install docker-compose
-        else
-            sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-        fi
-    fi
+#    if ! command -v docker-compose &> /dev/null; then
+#        echo "docker-compose未安装，正在安装..."
+#        if [[ "$OS" == "mac" ]]; then
+#           brew install docker-compose
+#        else
+#            sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+#           sudo chmod +x /usr/local/bin/docker-compose
+#       fi
+#    fi
 fi
 
 # 创建项目目录
