@@ -19,27 +19,53 @@ app.use(express.static(path.join(__dirname, 'dist/client')));
 
 // 数据库连接配置
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || '群晖主机IP地址',  // 群晖部署时请使用主机实际IP
   port: process.env.DB_PORT || 3306,
   database: process.env.DB_NAME || 'fridge_manager',
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
-};
+  queueLimit: 0,
+  connectTimeout: 10000,  // 增加连接超时时间
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 30000
+}
 
 // 创建数据库连接池
 const pool = mysql.createPool(dbConfig);
 
-// 测试数据库连接
-async function testDbConnection() {
+// 测试数据库连接并添加重试机制
+async function testDbConnection(attempt = 1) {
+  const maxAttempts = 3;
   try {
     const connection = await pool.getConnection();
     console.log('数据库连接成功');
     connection.release();
+    return true;
   } catch (error) {
-    console.error('数据库连接失败:', error);
+    console.error(`数据库连接失败(尝试 ${attempt}/${maxAttempts}):`, error);
+    
+    // 提供更详细的错误信息和解决方案
+    if (error.code === 'ECONNREFUSED') {
+      console.error('\n连接被拒绝，请检查:');
+      console.error('1. 群晖MariaDB服务是否已启动');
+      console.error('2. 数据库主机地址是否正确(使用群晖IP而非localhost)');
+      console.error('3. 数据库端口是否正确(默认3306)');
+      console.error('4. 防火墙设置是否允许连接');
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('\n访问被拒绝，请检查:');
+      console.error('1. 数据库用户名和密码是否正确');
+      console.error('2. 用户是否有权限从当前IP连接');
+    }
+    
+    if (attempt < maxAttempts) {
+      console.log(`等待5秒后重试...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return testDbConnection(attempt + 1);
+    }
+    
+    console.error('\n已达到最大重试次数，应用程序将退出');
     process.exit(1);
   }
 }

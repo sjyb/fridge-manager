@@ -38,7 +38,7 @@ fi
 
 # 获取群晖数据库信息
 echo "请输入群晖MariaDB数据库信息:"
-read -p "数据库主机(默认: localhost): " DB_HOST
+read -p "数据库主机(群晖IP地址，不可用localhost): " DB_HOST
 read -p "数据库端口(默认: 3306): " DB_PORT
 read -p "数据库名称(默认: fridge_manager): " DB_NAME
 read -p "数据库用户名: " DB_USER

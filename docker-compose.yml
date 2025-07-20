@@ -13,10 +13,10 @@ services:
     depends_on:
       - db
     environment:
-      - DB_HOST=db
-      - DB_NAME=fridge_manager
-      - DB_USER=root
-      - DB_PASSWORD=rootpassword
+      - DB_HOST=${DB_HOST:-群晖IP地址}
+      - DB_NAME=${DB_NAME:-fridge_manager}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - ORBSTACK_COMPAT=1
     restart: unless-stopped
     networks:
@@ -27,18 +27,19 @@ services:
       timeout: 10s
       retries: 3
 
-  db:
-    image: mariadb:10.6
-    volumes:
-      - db_data:/var/lib/mysql
-    environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
-      - MYSQL_DATABASE=fridge_manager
-    ports:
-      - "3306:3306"  # 云服务器部署建议注释此行，通过内部网络访问
-    restart: unless-stopped
-    networks:
-      - orbstack
+  # 注意：群晖部署时使用群晖自带MariaDB，无需此服务
+  # db:
+  #   image: mariadb:10.6
+  #   volumes:
+  #     - db_data:/var/lib/mysql
+  #   environment:
+  #     - MYSQL_ROOT_PASSWORD=rootpassword
+  #     - MYSQL_DATABASE=fridge_manager
+  #   ports:
+  #     - "3306:3306"
+  #   restart: unless-stopped
+  #   networks:
+  #     - orbstack
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 10s
