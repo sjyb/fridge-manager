@@ -1,37 +1,23 @@
-# 使用官方PHP镜像作为基础镜像
-FROM php:8.1-apache
-
-# 安装必要的PHP扩展
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    mariadb-client \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
-
-# 启用Apache的rewrite模块
-RUN a2enmod rewrite
+# 使用官方Node.js镜像作为基础镜像
+FROM node:18-alpine
 
 # 设置工作目录
-WORKDIR /var/www/html
+WORKDIR /app
+
+# 复制package.json和package-lock.json
+COPY package*.json ./
+
+# 安装依赖
+RUN npm install
 
 # 复制项目文件
 COPY . .
 
-# 安装Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# 安装依赖
-RUN composer install --no-dev --optimize-autoloader
-
-# 设置文件权限
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage
+# 构建前端应用
+RUN npm run build
 
 # 暴露端口
-EXPOSE 80
+EXPOSE 3000
 
-# 启动Apache
-CMD ["apache2-foreground"]
+# 启动Node.js服务器
+CMD ["node", "server.js"]
