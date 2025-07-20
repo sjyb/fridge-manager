@@ -1,3 +1,16 @@
+/* 旧版浏览器兼容性样式 */
+/* Safari 9不支持CSS变量，添加回退样式 */
+:root {
+  --tw-bg-opacity: 1;
+  --tw-text-opacity: 1;
+}
+
+/* 基础样式回退 */
+.bg-white { background-color: white; }
+.bg-gray-50 { background-color: #f9fafb; }
+.text-blue-500 { color: #3b82f6; }
+.text-gray-700 { color: #374151; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

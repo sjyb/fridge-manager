@@ -106,21 +106,59 @@ export function useFoods() {
         return parsedData;
       }
 
-      // 从本地数据库加载
-      const response = await fetch('/api/db.php');
-      if (!response.ok) throw new Error('Failed to load foods');
-      
-      const data = await response.json();
-      const finalFoods = data.length ? data : DEFAULT_FOODS;
-      
-      // 批量更新状态
-      requestAnimationFrame(() => {
-        setFoods(finalFoods);
-        setError(null);
-        localStorage.setItem(CACHE_KEY, JSON.stringify(finalFoods));
-      });
+// 从API加载数据 - 添加错误处理和兼容性处理
+let response;
+try {
+  response = await fetch('/api/foods');
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+} catch (error) {
+  console.error('Fetch failed, falling back to XMLHttpRequest:', error);
+  // 为不支持fetch的浏览器提供XMLHttpRequest回退
+  response = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/foods');
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve({
+          ok: true,
+          json: () => Promise.resolve(JSON.parse(xhr.responseText))
+        });
+      } else {
+        reject(new Error(`HTTP error! status: ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send();
+  });
+}
 
-      return finalFoods;
+const result = await response.json();
+
+// 检查是否返回了数据库状态信息
+if (result.database) {
+
+  console.log(`当前使用数据库: ${result.database}`);
+  
+  // 如果使用SQLite，显示通知
+  if (result.database === 'sqlite') {
+    toast.info('当前使用本地数据库模式', {
+      position: 'bottom-center',
+      duration: 5000
+    });
+  }
+}
+
+const data = result.data || result;
+const finalFoods = data.length ? data : DEFAULT_FOODS;
+
+// 批量更新状态
+requestAnimationFrame(() => {
+  setFoods(finalFoods);
+  setError(null);
+  localStorage.setItem(CACHE_KEY, JSON.stringify(finalFoods));
+});
+
+return finalFoods;
     } catch (error) {
       console.error('加载食物数据失败:', error);
       if (retryCount < 2) {
